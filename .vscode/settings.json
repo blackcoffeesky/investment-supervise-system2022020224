@@ -1,4 +1,18 @@
 {
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    // 确保语言服务器是 Pylance，而不是 None 或 Jedi
+    "python.languageServer": "Pylance",
+    // 将类型检查模式保持在你需要的级别 (如 basic 或 strict)
+    // 诊断的显示与否由下面的 overrides 控制
+    "python.analysis.typeCheckingMode": "off",
+    // 关键部分：使用通配符关闭所有诊断的显示
+    "python.analysis.diagnosticSeverityOverrides": {
+        "*": "none"   // 这会覆盖所有规则，包括你之前列出的那些
+        // 如果你想单独保留某个规则，可以在这里单独指定，
+        // 例如，将 import 报错降级为信息提示:
+        // "reportMissingImports": "information"
+    },
+    // 建议将诊断模式设置为仅打开文件，减少资源占用
+    "python.analysis.diagnosticMode": "openFilesOnly"
 }

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投资组合分析系统 · 行业预期管理</title>
+    <!-- 引入 ECharts -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+    <!-- 引入 Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <!-- 引入 SQL.js -->
+    <script src="https://cdn.jsdelivr.net/npm/sql.js@1.8.0/dist/sql-wasm.js"></script>
+    <!-- 引入样式 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-chart-pie"></i>
+                投资组合分析系统
+            </h1>
+            <div class="subtitle">
+                <i class="fas fa-database"></i> 模块化设计 · 实时分析 · 预期仓位管理
+            </div>
+        </div>
+
+        <!-- 数据库控制模块 -->
+        <div class="db-control">
+            <div class="file-input">
+                <label for="dbFile" style="cursor: pointer;">
+                    <i class="fas fa-folder-open"></i>
+                    <span id="fileName">选择数据库文件 (.db)</span>
+                </label>
+                <input type="file" id="dbFile" accept=".db,.sqlite,.sqlite3" style="display: none;">
+            </div>
+            <div class="actions">
+                <button class="btn-primary" id="loadBtn" disabled>
+                    <i class="fas fa-sync-alt"></i> 加载数据
+                </button>
+                <button class="btn-primary" id="saveDbBtn" style="background: #10b981;">
+                    <i class="fas fa-save"></i> 保存修改
+                </button>
+                <div class="status-badge" id="dbStatus">
+                    <i class="fas fa-info-circle"></i> 未连接
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计卡片模块 -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="fas fa-coins"></i></div>
+                <div class="stat-content">
+                    <h3>总资产</h3>
+                    <div class="value" id="totalAsset">--</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fas fa-chart-line"></i></div>
+                <div class="stat-content">
+                    <h3>持仓数量</h3>
+                    <div class="value" id="positionCount">--</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple"><i class="fas fa-layer-group"></i></div>
+                <div class="stat-content">
+                    <h3>一级行业</h3>
+                    <div class="value" id="level1Count">--</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange"><i class="fas fa-tags"></i></div>
+                <div class="stat-content">
+                    <h3>风格数量</h3>
+                    <div class="value" id="styleCount">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs 模块化图表 - 新增预期管理Tab -->
+        <div class="tabs">
+            <div class="tab-header">
+                <button class="tab-btn active" data-tab="level1">
+                    <i class="fas fa-building"></i> 一级行业
+                </button>
+                <button class="tab-btn" data-tab="level2">
+                    <i class="fas fa-store-alt"></i> 二级行业
+                </button>
+                <button class="tab-btn" data-tab="style">
+                    <i class="fas fa-palette"></i> 风格分布
+                </button>
+                <button class="tab-btn" data-tab="stocks">
+                    <i class="fas fa-chart-bar"></i> 具体标的
+                </button>
+                <button class="tab-btn" data-tab="expected">
+                    <i class="fas fa-bullseye"></i> 预期仓位管理
+                </button>
+            </div>
+
+            <div class="tab-content">
+                <!-- 一级行业 -->
+                <div class="tab-pane active" id="tab-level1">
+                    <div class="chart-wrapper">
+                        <div id="chartLevel1" class="chart-main"></div>
+                        <div class="chart-sidebar">
+                            <h4><i class="fas fa-filter"></i> 筛选一级行业</h4>
+                            <div class="filter-group">
+                                <select class="filter-select" id="filterLevel1" multiple size="5">
+                                    <option value="all" selected>全部显示</option>
+                                </select>
+                            </div>
+                            <button class="btn-outline" id="resetLevel1" style="width:100%; margin-top:16px;">
+                                <i class="fas fa-undo-alt"></i> 重置筛选
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 一级行业对比图 -->
+                    <div style="margin: 10px 0; display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
+                        <label style="font-size: 13px; color: #64748b;">
+                            <i class="fas fa-filter"></i> 偏差阈值:
+                        </label>
+                        <input type="number" id="biasThreshold" value="0" step="0.5" min="0" 
+                            style="width: 80px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <span style="font-size: 12px; color: #94a3b8;">只显示 |实际-预期| ≥ 阈值 的行业</span>
+                    </div>
+                    <div id="chartLevel1Compare" style="height: 400px; width: 100%;"></div>
+                </div>
+
+                <!-- 二级行业 -->
+                <div class="tab-pane" id="tab-level2">
+                    <div class="chart-wrapper">
+                        <div id="chartLevel2" class="chart-main"></div>
+                        <div class="chart-sidebar">
+                            <h4><i class="fas fa-filter"></i> 二级行业筛选</h4>
+                            <div class="filter-group">
+                                <label style="font-size:0.85rem; color:#64748b;">一级行业</label>
+                                <select class="filter-select" id="filterLevel1ForLevel2">
+                                    <option value="all">全部一级行业</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label style="font-size:0.85rem; color:#64748b;">二级行业</label>
+                                <select class="filter-select" id="filterLevel2" multiple size="4">
+                                    <option value="all" selected>全部显示</option>
+                                </select>
+                            </div>
+                            <button class="btn-outline" id="resetLevel2" style="width:100%;">
+                                <i class="fas fa-undo-alt"></i> 重置筛选
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 二级行业对比图 -->
+                    <div style="margin: 10px 0; display: flex; align-items: center; gap: 12px; justify-content: flex-end;">
+                        <label style="font-size: 13px; color: #64748b;">
+                            <i class="fas fa-filter"></i> 偏差阈值:
+                        </label>
+                        <input type="number" id="biasThreshold2" value="0" step="0.5" min="0" 
+                            style="width: 80px; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                        <span style="font-size: 12px; color: #94a3b8;">只显示 |实际-预期| ≥ 阈值 的行业</span>
+                    </div>
+                    <div id="chartLevel2Compare" style="height: 400px; width: 100%;"></div>
+                </div>
+
+                <!-- 风格分布 -->
+                <div class="tab-pane" id="tab-style">
+                    <div class="chart-wrapper">
+                        <div id="chartStyle" class="chart-main"></div>
+                        <div class="chart-sidebar">
+                            <h4><i class="fas fa-filter"></i> 筛选风格</h4>
+                            <div class="filter-group">
+                                <select class="filter-select" id="filterStyle" multiple size="5">
+                                    <option value="all" selected>全部显示</option>
+                                </select>
+                            </div>
+                            <button class="btn-outline" id="resetStyle" style="width:100%;">
+                                <i class="fas fa-undo-alt"></i> 重置筛选
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 具体标的 -->
+                <div class="tab-pane" id="tab-stocks">
+                    <div class="chart-wrapper">
+                        <div id="chartStocks" class="chart-main"></div>
+                        <div class="chart-sidebar">
+                            <h4><i class="fas fa-filter"></i> 筛选标的</h4>
+                            <div class="filter-group">
+                                <select class="filter-select" id="filterStocks" multiple size="6">
+                                    <option value="all" selected>全部显示</option>
+                                </select>
+                            </div>
+                            <button class="btn-outline" id="resetStocks" style="width:100%;">
+                                <i class="fas fa-undo-alt"></i> 重置筛选
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 预期仓位管理 -->
+                <div class="tab-pane" id="tab-expected">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="expected-panel" id="level1ExpectedEditor" style="background: #f8fafc; padding: 16px; border-radius: 12px;">
+                            <h4 style="margin-bottom:12px;"><i class="fas fa-chart-line"></i> 一级行业预期仓位 (%)</h4>
+                            <p style="color: #64748b; font-size: 12px; margin-bottom: 12px;">修改后点击保存按钮导出数据库</p>
+                        </div>
+                        <div class="expected-panel" id="level2ExpectedEditor" style="background: #f8fafc; padding: 16px; border-radius: 12px; overflow-y: auto; max-height: 500px;">
+                            <h4 style="margin-bottom:12px;"><i class="fas fa-chart-line"></i> 二级行业预期仓位 (%)</h4>
+                            <p style="color: #64748b; font-size: 12px; margin-bottom: 12px;">修改后点击保存按钮导出数据库</p>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px; padding: 16px; background: #eef2ff; border-radius: 12px;">
+                        <i class="fas fa-info-circle"></i> 提示：修改预期仓位后，点击右上角"保存修改"按钮即可导出更新后的数据库文件。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入JavaScript模块 -->
+    <script src="js/database.js"></script>
+    <script src="js/charts.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
